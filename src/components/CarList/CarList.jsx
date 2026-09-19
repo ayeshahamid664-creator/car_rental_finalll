@@ -1,3 +1,4 @@
+// src/components/CarList/CarList.jsx
 import React from 'react';
 import { useCart } from '../../context/CartContext';
 import { useProducts } from '../../context/ProductContext';
@@ -54,27 +55,25 @@ const CarList = ({ theme, showAll = false }) => {
                   <div className={`relative h-52 flex items-center justify-center overflow-hidden ${
                     theme === 'dark' ? 'bg-gray-950' : 'bg-gray-100'
                   }`}>
-                    {/* Radial glow */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl group-hover:bg-yellow-500/20 transition-all duration-700" />
                     </div>
 
-                    {/* Mileage badge */}
                     <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/80 dark:bg-white/10 backdrop-blur text-white text-[10px] font-semibold tracking-wide">
                       <FaGasPump size={9} />
                       {car.mileage || '12km'}
                     </div>
 
-                    {/* Category badge */}
                     {car.category && (
                       <div className="absolute top-4 right-4 z-10 px-2.5 py-1 rounded-full bg-yellow-500 text-black text-[10px] font-bold tracking-wider uppercase">
                         {car.category}
                       </div>
                     )}
 
+                    {/* ⭐ FIX: image_dark (snake_case from Supabase) */}
                     <img
                       className="relative z-[1] w-[85%] h-auto object-contain transition-transform duration-700 group-hover:scale-110 group-hover:-translate-y-1"
-                      src={theme === 'dark' ? car.imageDark : car.image}
+                      src={theme === 'dark' ? (car.image_dark || car.image) : car.image}
                       alt={car.name}
                     />
                   </div>
@@ -90,7 +89,6 @@ const CarList = ({ theme, showAll = false }) => {
                       </p>
                     </div>
 
-                    {/* Specs row */}
                     <div className="flex items-center gap-4 pt-4 border-t border-current/10">
                       <div className="flex items-center gap-1.5 text-xs opacity-70">
                         <FaUsers size={11} className="text-yellow-500" /> 5
@@ -103,7 +101,6 @@ const CarList = ({ theme, showAll = false }) => {
                       </div>
                     </div>
 
-                    {/* Price + CTA */}
                     <div className="flex items-end justify-between pt-2">
                       <div>
                         <p className="text-[10px] uppercase tracking-widest opacity-50 font-semibold mb-0.5">

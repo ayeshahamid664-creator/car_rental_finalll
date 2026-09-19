@@ -1,49 +1,97 @@
-import React, { createContext, useContext } from 'react';
-import useLocalStorage from '../hooks/useLocalStorage';
+// src/context/BannerContext.jsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../supabase';
 
 const BannerContext = createContext();
 
-// Original banner (ye sirf reference ke liye hai — hero me use nahi hoga)
-const defaultBanners = [
-  {
-    id: 1,
-    title: 'Effortless',
-    subtitle: 'Car Rental',
-    description: 'Original hero banner — ye Hero.jsx me hardcoded hai',
-    buttonText: 'Get Started',
-    active: false,   // ⭐ Ab ye active nahi rahega
-  },
-];
-
 export const BannerProvider = ({ children }) => {
-  const [banners, setBanners] = useLocalStorage('banners', defaultBanners);
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const addBanner = (banner) => {
-    const newBanner = { ...banner, id: Date.now(), active: true };
-    setBanners((prev) => [...prev, newBanner]);
-    return newBanner;
+  // ── Fetch banners
+  const fetchBanners = async () => {
+    const { data, error } = await supabase
+      .from('banners')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) setBanners(data);
+    setLoading(false);
   };
 
-  const updateBanner = (id, data) => {
-    setBanners((prev) => prev.map((b) => (b.id === id ? { ...b, ...data } : b)));
+  useEffect(() => {
+    fetchBanners();
+
+    // Real-time updates
+    const channel = supabase
+      .channel('banners-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'banners' },
+        fetchBanners
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // ── Add banner
+  const addBanner = async (banner) => {
+    const { error } = await supabase.from('banners').insert([
+      {
+        title: banner.title,
+        subtitle: banner.subtitle,
+        description: banner.description,
+        button_text: banner.buttonText,
+        active: true,
+      },
+    ]);
+    if (error) console.error('Add banner error:', error);
   };
 
-  const deleteBanner = (id) => {
-    setBanners((prev) => prev.filter((b) => b.id !== id));
+  // ── Update banner
+  const updateBanner = async (id, data) => {
+    const { error } = await supabase
+      .from('banners')
+      .update({
+        title: data.title,
+        subtitle: data.subtitle,
+        description: data.description,
+        button_text: data.buttonText,
+      })
+      .eq('id', id);
+    if (error) console.error('Update banner error:', error);
   };
 
-  const toggleBanner = (id) => {
-    setBanners((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, active: !b.active } : b))
-    );
+  // ── Delete banner
+  const deleteBanner = async (id) => {
+    const { error } = await supabase.from('banners').delete().eq('id', id);
+    if (error) console.error('Delete banner error:', error);
   };
 
-  // Ab active banner ki zaroorat nahi, but context me rakh rahe hain
+  // ── Toggle banner
+  const toggleBanner = async (id) => {
+    const banner = banners.find((b) => b.id === id);
+    if (!banner) return;
+    const { error } = await supabase
+      .from('banners')
+      .update({ active: !banner.active })
+      .eq('id', id);
+    if (error) console.error('Toggle banner error:', error);
+  };
+
   const activeBanner = banners.find((b) => b.active);
 
   return (
     <BannerContext.Provider
-      value={{ banners, activeBanner, addBanner, updateBanner, deleteBanner, toggleBanner }}
+      value={{
+        banners,
+        loading,
+        activeBanner,
+        addBanner,
+        updateBanner,
+        deleteBanner,
+        toggleBanner,
+      }}
     >
       {children}
     </BannerContext.Provider>

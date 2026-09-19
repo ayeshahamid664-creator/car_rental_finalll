@@ -1,60 +1,92 @@
+// src/context/ProductContext.jsx
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import useLocalStorage from '../hooks/useLocalStorage';
-
-import bmwUxLight from '../assets/bmw ux.jpeg';
-import bmwUxDark from '../assets/bmw ux black ground.png';
-import kiaUxLight from '../assets/kia ux.jpeg';
-import kiaUxDark from '../assets/kia ux black background.png';
-import bmwUxPremiumLight from '../assets/gray bmw ux.jpeg';
-import bmwUxPremiumDark from '../assets/grey bmw black back ground.png';
+import { supabase } from '../supabase';
 
 const ProductContext = createContext();
 
-const defaultCars = [
-  { id: 1, name: 'BMW UX', price: 100, image: bmwUxLight, imageDark: bmwUxDark, mileage: '12km', category: 'Luxury' },
-  { id: 2, name: 'KIA UX', price: 140, image: kiaUxLight, imageDark: kiaUxDark, mileage: '15km', category: 'SUV' },
-  { id: 3, name: 'BMW UX Premium', price: 100, image: bmwUxPremiumLight, imageDark: bmwUxPremiumDark, mileage: '10km', category: 'Luxury' },
-];
-
 export const ProductProvider = ({ children }) => {
-  const [products, setProducts] = useLocalStorage('products', defaultCars);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ── Fetch products
+  const fetchProducts = async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (!error && data) setProducts(data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
+    fetchProducts();
+
+    // Real-time updates
+    const channel = supabase
+      .channel('products-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        fetchProducts
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, []);
 
-  const addProduct = (product) => {
-    const newProduct = { 
-      ...product, 
-      id: Date.now(),
-      imageDark: product.imageDark || product.image,  // ⭐ Fallback
-    };
-    setProducts((prev) => [...prev, newProduct]);
-    return newProduct;
+  // ── Add product
+  const addProduct = async (product) => {
+    const { error } = await supabase.from('products').insert([
+      {
+        name: product.name,
+        price: Number(product.price),
+        image: product.image,
+        image_dark: product.imageDark || product.image,
+        mileage: product.mileage,
+        category: product.category,
+      },
+    ]);
+    if (error) console.error('Add product error:', error);
   };
 
-  const updateProduct = (id, updatedData) => {
-    setProducts((prev) => prev.map((p) => {
-      if (p.id === id) {
-        const merged = { ...p, ...updatedData };
-        if (!merged.imageDark) merged.imageDark = merged.image;  // ⭐ Fallback
-        return merged;
-      }
-      return p;
-    }));
+  // ── Update product
+  const updateProduct = async (id, data) => {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        name: data.name,
+        price: Number(data.price),
+        image: data.image,
+        image_dark: data.imageDark || data.image,
+        mileage: data.mileage,
+        category: data.category,
+      })
+      .eq('id', id);
+    if (error) console.error('Update product error:', error);
   };
 
-  const deleteProduct = (id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  // ── Delete product
+  const deleteProduct = async (id) => {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) console.error('Delete product error:', error);
   };
 
-  const resetProducts = () => setProducts(defaultCars);
+  // ── Reset products
+  const resetProducts = async () => {
+    const { error } = await supabase.from('products').delete().neq('id', 0);
+    if (error) console.error('Reset products error:', error);
+  };
 
   return (
     <ProductContext.Provider
-      value={{ products, loading, addProduct, updateProduct, deleteProduct, resetProducts }}
+      value={{
+        products,
+        loading,
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        resetProducts,
+      }}
     >
       {children}
     </ProductContext.Provider>

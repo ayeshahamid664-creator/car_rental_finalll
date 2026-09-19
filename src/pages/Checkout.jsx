@@ -1,3 +1,4 @@
+// src/pages/Checkout.jsx
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useOrders } from '../context/OrderContext';
@@ -69,7 +70,12 @@ const Checkout = ({ theme }) => {
             {cart.map(item => (
               <div key={item.id} className="flex justify-between py-3 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
-                  <img src={item.image} alt={item.name} className="w-12 h-12 object-contain" />
+                  {/* ⭐ FIX: image_dark (snake_case from Supabase) */}
+                  <img
+                    src={theme === 'dark' ? (item.image_dark || item.image) : item.image}
+                    alt={item.name}
+                    className="w-12 h-12 object-contain"
+                  />
                   <div>
                     <p className="font-semibold text-sm">{item.name}</p>
                     <p className="text-xs opacity-60">Qty: {item.quantity}</p>

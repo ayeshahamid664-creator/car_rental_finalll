@@ -1,3 +1,4 @@
+// src/components/Admin/ProductTable.jsx
 import React, { useState, useMemo } from 'react';
 import { FaEdit, FaTrash, FaSearch, FaFilter, FaTh, FaList } from 'react-icons/fa';
 
@@ -24,7 +25,6 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
 
   return (
     <div className="space-y-6">
-      {/* ── Toolbar */}
       <div className={`p-5 rounded-3xl flex flex-wrap items-center gap-3 border ${
         theme === 'dark' ? 'bg-gray-900 border-white/10' : 'bg-white border-black/10 shadow-sm'
       }`}>
@@ -80,7 +80,6 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
         </span>
       </div>
 
-      {/* ── Empty state */}
       {filtered.length === 0 && (
         <div className={`p-16 text-center rounded-3xl border ${
           theme === 'dark' ? 'bg-gray-900 border-white/10' : 'bg-white border-black/10 shadow-sm'
@@ -90,7 +89,6 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
         </div>
       )}
 
-      {/* ── Grid view */}
       {viewMode === 'grid' && filtered.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map((product) => (
@@ -105,9 +103,9 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
               <div className={`h-40 flex items-center justify-center relative ${
                 theme === 'dark' ? 'bg-white/[0.02]' : 'bg-black/[0.02]'
               }`}>
-                {/* ⭐ FIX: Theme-aware image */}
+                {/* ⭐ FIX: image_dark */}
                 <img
-                  src={theme === 'dark' ? (product.imageDark || product.image) : product.image}
+                  src={theme === 'dark' ? (product.image_dark || product.image) : product.image}
                   alt={product.name}
                   className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-500 group-hover:scale-105"
                 />
@@ -151,7 +149,6 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
         </div>
       )}
 
-      {/* ── List view */}
       {viewMode === 'list' && filtered.length > 0 && (
         <div className={`rounded-3xl overflow-hidden border ${
           theme === 'dark' ? 'border-white/10 bg-gray-900' : 'border-black/10 bg-white shadow-sm'
@@ -182,11 +179,11 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
                         <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
                           theme === 'dark' ? 'bg-white/5' : 'bg-black/5'
                         }`}>
-                          {/* ⭐ FIX: Theme-aware image */}
-                          <img 
-                            src={theme === 'dark' ? (p.imageDark || p.image) : p.image} 
-                            alt={p.name} 
-                            className="max-w-[80%] max-h-[80%] object-contain" 
+                          {/* ⭐ FIX: image_dark */}
+                          <img
+                            src={theme === 'dark' ? (p.image_dark || p.image) : p.image}
+                            alt={p.name}
+                            className="max-w-[80%] max-h-[80%] object-contain"
                           />
                         </div>
                         <span className="font-semibold text-sm">{p.name}</span>
