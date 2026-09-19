@@ -14,16 +14,7 @@ import ProductTable from './ProductTable';
 import ConfirmModal from './ConfirmModal';
 
 const AdminPanel = ({ theme }) => {
-  // ⭐ originalCars bhi destructure kiya
-  const {
-    products,
-    originalCars,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    resetProducts,
-  } = useProducts();
-
+  const { products, addProduct, updateProduct, deleteProduct, resetProducts } = useProducts();
   const { orders, updateOrderStatus, deleteOrder, stats } = useOrders();
   const { banners, addBanner, updateBanner, deleteBanner, toggleBanner } = useBanners();
   const { showToast } = useToast();
@@ -48,76 +39,51 @@ const AdminPanel = ({ theme }) => {
   const closeConfirm = () =>
     setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
 
-  // ── Check: kya ye original car hai?
-  const isOriginalCar = (product) => {
-    if (!product) return false;
-    return (
-      product.isOriginal === true ||
-      originalCars.some((c) => c.id === product.id)
-    );
-  };
-
   // ── Products
   const handleFormChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // ⭐ Safety: original car edit na ho
-    if (editingProduct && isOriginalCar(editingProduct)) {
-      showToast('Original cars edit nahi ho sakti', 'warning');
-      return;
+    try {
+      const productData = { ...formData, price: Number(formData.price) };
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, productData);
+        showToast('Product updated!', 'success');
+        setEditingProduct(null);
+      } else {
+        await addProduct(productData);
+        showToast('Product added!', 'success');
+      }
+      setFormData({ name: '', price: '', image: '', imageDark: '', mileage: '', category: '' });
+    } catch (err) {
+      console.error(err);
+      showToast('Something went wrong!', 'warning');
     }
-
-    const productData = { ...formData, price: Number(formData.price) };
-
-    if (editingProduct) {
-      await updateProduct(editingProduct.id, productData);
-      showToast('Product updated!', 'success');
-      setEditingProduct(null);
-    } else {
-      await addProduct(productData);
-      showToast('Product added!', 'success');
-    }
-
-    setFormData({
-      name: '', price: '', image: '', imageDark: '', mileage: '', category: '',
-    });
   };
 
   const handleEdit = (product) => {
-    // ⭐ Original car pe edit block
-    if (isOriginalCar(product)) {
-      showToast('Original cars edit nahi ho sakti', 'warning');
-      return;
-    }
-
     setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      imageDark: product.image_dark || product.imageDark || '',
-      mileage: product.mileage || '',
-      category: product.category || '',
-    });
+    setFormData(product);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = (product) => {
-    // ⭐ Original car pe delete block
-    if (isOriginalCar(product)) {
-      showToast('Original cars delete nahi ho sakti', 'warning');
+    if (product.isLocal) {
+      showToast('Default car — cannot be deleted!', 'warning');
       return;
     }
-
     openConfirm(
       'Delete Product?',
       `Are you sure you want to delete "${product.name}"?`,
       async () => {
-        await deleteProduct(product.id);
-        showToast('Product deleted', 'warning');
+        try {
+          await deleteProduct(product.id);
+          showToast('Product deleted', 'warning');
+        } catch (err) {
+          console.error(err);
+          showToast('Delete failed!', 'warning');
+        }
         closeConfirm();
       }
     );
@@ -125,18 +91,21 @@ const AdminPanel = ({ theme }) => {
 
   const handleCancelEdit = () => {
     setEditingProduct(null);
-    setFormData({
-      name: '', price: '', image: '', imageDark: '', mileage: '', category: '',
-    });
+    setFormData({ name: '', price: '', image: '', imageDark: '', mileage: '', category: '' });
   };
 
   const handleReset = () => {
     openConfirm(
-      'Reset Admin Products?',
-      'Sirf admin se add ki gayi products delete hongi. Original 3 cars safe rahengi.',
+      'Reset Products?',
+      'All admin-added products will be deleted. Your 3 default cars will stay safe.',
       async () => {
-        await resetProducts();
-        showToast('Admin products reset!', 'info');
+        try {
+          await resetProducts();
+          showToast('Products reset!', 'info');
+        } catch (err) {
+          console.error(err);
+          showToast('Reset failed!', 'warning');
+        }
         closeConfirm();
       }
     );
@@ -145,25 +114,25 @@ const AdminPanel = ({ theme }) => {
   // ── Banners
   const handleBannerSubmit = async (e) => {
     e.preventDefault();
-    if (editingBanner) {
-      await updateBanner(editingBanner.id, bannerForm);
-      showToast('Banner updated!', 'success');
-      setEditingBanner(null);
-    } else {
-      await addBanner(bannerForm);
-      showToast('Banner added!', 'success');
+    try {
+      if (editingBanner) {
+        await updateBanner(editingBanner.id, bannerForm);
+        showToast('Banner updated!', 'success');
+        setEditingBanner(null);
+      } else {
+        await addBanner(bannerForm);
+        showToast('Banner added!', 'success');
+      }
+      setBannerForm({ title: '', subtitle: '', description: '', buttonText: '' });
+    } catch (err) {
+      console.error(err);
+      showToast('Something went wrong!', 'warning');
     }
-    setBannerForm({ title: '', subtitle: '', description: '', buttonText: '' });
   };
 
   const handleBannerEdit = (banner) => {
     setEditingBanner(banner);
-    setBannerForm({
-      title: banner.title,
-      subtitle: banner.subtitle,
-      description: banner.description,
-      buttonText: banner.button_text || '',
-    });
+    setBannerForm(banner);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -172,8 +141,13 @@ const AdminPanel = ({ theme }) => {
       'Delete Banner?',
       `Delete "${banner.subtitle}" banner?`,
       async () => {
-        await deleteBanner(banner.id);
-        showToast('Banner deleted', 'warning');
+        try {
+          await deleteBanner(banner.id);
+          showToast('Banner deleted', 'warning');
+        } catch (err) {
+          console.error(err);
+          showToast('Delete failed!', 'warning');
+        }
         closeConfirm();
       }
     );
@@ -183,10 +157,15 @@ const AdminPanel = ({ theme }) => {
   const handleOrderDelete = (order) => {
     openConfirm(
       'Delete Order?',
-      `Delete order from ${order.customer_name}?`,
+      `Delete order from ${order.customerName}?`,
       async () => {
-        await deleteOrder(order.id);
-        showToast('Order deleted', 'warning');
+        try {
+          await deleteOrder(order.id);
+          showToast('Order deleted', 'warning');
+        } catch (err) {
+          console.error(err);
+          showToast('Delete failed!', 'warning');
+        }
         closeConfirm();
       }
     );
@@ -240,7 +219,7 @@ const AdminPanel = ({ theme }) => {
                     : 'border-black/10 hover:border-yellow-500 hover:text-yellow-500'
                 }`}
               >
-                Reset Admin Products
+                Reset Products
               </button>
               <button
                 onClick={handleLogout}
@@ -251,7 +230,7 @@ const AdminPanel = ({ theme }) => {
             </div>
           </div>
 
-          {/* ── Tabs */}
+          {/* ── Tabs (pill style) */}
           <div className="flex flex-wrap gap-2 py-8">
             {tabs.map((t) => (
               <button
@@ -286,19 +265,6 @@ const AdminPanel = ({ theme }) => {
           {/* ── Products */}
           {activeTab === 'products' && (
             <div className="space-y-8">
-              {/* Info banner */}
-              <div className={`p-4 rounded-2xl border flex items-center gap-3 text-xs ${
-                theme === 'dark'
-                  ? 'bg-blue-500/5 border-blue-500/20 text-blue-300'
-                  : 'bg-blue-50 border-blue-200 text-blue-700'
-              }`}>
-                <span className="text-lg">💡</span>
-                <p>
-                  <strong>Original 3 cars</strong> locked hain — inhe edit ya delete nahi kar sakte.
-                  Sirf admin se add ki gayi cars manage ho sakti hain.
-                </p>
-              </div>
-
               <ProductForm
                 theme={theme}
                 formData={formData}
@@ -307,10 +273,8 @@ const AdminPanel = ({ theme }) => {
                 editingProduct={editingProduct}
                 onCancel={handleCancelEdit}
               />
-
               <ProductTable
                 products={products}
-                originalCars={originalCars}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 theme={theme}
@@ -345,18 +309,18 @@ const AdminPanel = ({ theme }) => {
                       <div className="flex-1 min-w-[260px]">
                         <div className="flex items-center gap-3 mb-5">
                           <div className="w-11 h-11 rounded-2xl bg-yellow-500/15 text-yellow-500 flex items-center justify-center font-bold text-sm">
-                            #{order.id.toString().slice(-3)}
+                            #{String(order.id).slice(-3)}
                           </div>
                           <div>
-                            <p className="font-semibold">{order.customer_name}</p>
-                            <p className="text-xs opacity-50">{order.customer_email}</p>
+                            <p className="font-semibold">{order.customerName}</p>
+                            <p className="text-xs opacity-50">{order.customerEmail}</p>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
                             <p className="text-[10px] uppercase tracking-widest opacity-40 font-semibold mb-1">Phone</p>
-                            <p className="font-medium text-xs">{order.customer_phone || '—'}</p>
+                            <p className="font-medium text-xs">{order.customerPhone || '—'}</p>
                           </div>
                           <div>
                             <p className="text-[10px] uppercase tracking-widest opacity-40 font-semibold mb-1">Items</p>
@@ -369,7 +333,7 @@ const AdminPanel = ({ theme }) => {
                           <div>
                             <p className="text-[10px] uppercase tracking-widest opacity-40 font-semibold mb-1">Date</p>
                             <p className="font-medium text-xs">
-                              {new Date(order.created_at).toLocaleDateString()}
+                              {new Date(order.createdAt).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
@@ -382,7 +346,7 @@ const AdminPanel = ({ theme }) => {
                             <div className="flex flex-wrap gap-2">
                               {order.items.map((item, idx) => (
                                 <span
-                                  key={idx}
+                                  key={item.id || idx}
                                   className={`text-xs px-3 py-1 rounded-full ${
                                     theme === 'dark' ? 'bg-white/5' : 'bg-black/5'
                                   }`}
@@ -399,8 +363,13 @@ const AdminPanel = ({ theme }) => {
                         <select
                           value={order.status}
                           onChange={async (e) => {
-                            await updateOrderStatus(order.id, e.target.value);
-                            showToast(`Order status: ${e.target.value}`, 'info');
+                            try {
+                              await updateOrderStatus(order.id, e.target.value);
+                              showToast(`Order status: ${e.target.value}`, 'info');
+                            } catch (err) {
+                              console.error(err);
+                              showToast('Update failed!', 'warning');
+                            }
                           }}
                           className={`px-4 py-2.5 rounded-xl border text-xs font-semibold capitalize outline-none transition-colors focus:border-yellow-500 ${
                             theme === 'dark'
@@ -509,7 +478,14 @@ const AdminPanel = ({ theme }) => {
                     <p className="text-sm opacity-70 mb-5 leading-relaxed">{b.description}</p>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => toggleBanner(b.id)}
+                        onClick={async () => {
+                          try {
+                            await toggleBanner(b.id);
+                          } catch (err) {
+                            console.error(err);
+                            showToast('Toggle failed!', 'warning');
+                          }
+                        }}
                         className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
                           b.active
                             ? 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white'

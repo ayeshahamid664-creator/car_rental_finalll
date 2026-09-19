@@ -1,8 +1,7 @@
-// src/context/ProductContext.jsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { supabase } from '../supabase';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import useLocalStorage from '../hooks/useLocalStorage';
+import { supabase } from '../lib/supabase';
 
-// ⭐ ORIGINAL 3 CARS — inhe hum localStorage mein rakhenge
 import bmwUxLight from '../assets/bmw ux.jpeg';
 import bmwUxDark from '../assets/bmw ux black ground.png';
 import kiaUxLight from '../assets/kia ux.jpeg';
@@ -12,196 +11,162 @@ import bmwUxPremiumDark from '../assets/grey bmw black back ground.png';
 
 const ProductContext = createContext();
 
-const ORIGINALS_KEY = 'original-cars-v1';
-
-// ⭐ ORIGINAL 3 CARS — hardcoded, image_dark (snake_case) for consistency
-const ORIGINAL_CARS = [
-  {
-    id: 1,
-    name: 'BMW UX',
-    price: 100,
-    image: bmwUxLight,
-    image_dark: bmwUxDark,
-    mileage: '12km',
-    category: 'Luxury',
-    isOriginal: true,
-  },
-  {
-    id: 2,
-    name: 'KIA UX',
-    price: 140,
-    image: kiaUxLight,
-    image_dark: kiaUxDark,
-    mileage: '15km',
-    category: 'SUV',
-    isOriginal: true,
-  },
-  {
-    id: 3,
-    name: 'BMW UX Premium',
-    price: 100,
-    image: bmwUxPremiumLight,
-    image_dark: bmwUxPremiumDark,
-    mileage: '10km',
-    category: 'Luxury',
-    isOriginal: true,
-  },
+// ⭐ SIRF YE 3 CARDS LOCAL RAHENGE (kabhi delete nahi honge)
+const LOCAL_CARS = [
+  { id: 'local-1', name: 'BMW UX', price: 100, image: bmwUxLight, imageDark: bmwUxDark, mileage: '12km', category: 'Luxury', isLocal: true },
+  { id: 'local-2', name: 'KIA UX', price: 140, image: kiaUxLight, imageDark: kiaUxDark, mileage: '15km', category: 'SUV', isLocal: true },
+  { id: 'local-3', name: 'BMW UX Premium', price: 100, image: bmwUxPremiumLight, imageDark: bmwUxPremiumDark, mileage: '10km', category: 'Luxury', isLocal: true },
 ];
 
-// ── localStorage se originals load karo (agar user ne customize kiye ho)
-// Note: images ko localStorage mein save nahi kar sakte (base64 huge hoti hai),
-// isliye hum sirf metadata save karenge aur images code se hi use karenge.
-const loadOriginals = () => {
-  try {
-    const saved = localStorage.getItem(ORIGINALS_KEY);
-    if (!saved) return ORIGINAL_CARS;
-    const parsed = JSON.parse(saved);
-    // Merge saved metadata with current image imports
-    return ORIGINAL_CARS.map((car, i) => ({
-      ...car,
-      ...(parsed[i] || {}),
-      image: car.image,           // image hamesha code se
-      image_dark: car.image_dark, // image_dark hamesha code se
-      isOriginal: true,
-    }));
-  } catch {
-    return ORIGINAL_CARS;
-  }
-};
-
 export const ProductProvider = ({ children }) => {
-  // ⭐ ORIGINAL CARS — localStorage wali state
-  const [originalCars, setOriginalCars] = useState(loadOriginals);
-
-  // ⭐ ADMIN CARS — Supabase wali state
-  const [adminProducts, setAdminProducts] = useState([]);
-
+  const [remoteProducts, setRemoteProducts] = useState([]); // Supabase se
   const [loading, setLoading] = useState(true);
 
-  // ── Persist originals to localStorage whenever they change
-  useEffect(() => {
+  // ── Fetch from Supabase
+  const fetchProducts = useCallback(async () => {
     try {
-      // Sirf metadata save karo (images chhod do)
-      const meta = originalCars.map(({ id, name, price, mileage, category }) => ({
-        id, name, price, mileage, category,
-      }));
-      localStorage.setItem(ORIGINALS_KEY, JSON.stringify(meta));
-    } catch (e) {
-      console.error('localStorage save error:', e);
-    }
-  }, [originalCars]);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  // ── Fetch admin products from Supabase
-  const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) setAdminProducts(data);
-    if (error) console.error('Fetch products error:', error);
-    setLoading(false);
-  };
+      if (error) throw error;
+
+      // Map snake_case to camelCase
+      const mapped = (data || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.price),
+        image: p.image,
+        imageDark: p.image_dark || p.image,
+        mileage: p.mileage,
+        category: p.category,
+        isLocal: false,
+      }));
+
+      setRemoteProducts(mapped);
+    } catch (err) {
+      console.error('Fetch products error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchProducts();
+  }, [fetchProducts]);
 
-    const channel = supabase
-      .channel('products-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        fetchProducts
-      )
-      .subscribe();
+  // ⭐ Combine: Local cards pehle, phir Supabase wale
+  const products = [...LOCAL_CARS, ...remoteProducts];
 
-    return () => supabase.removeChannel(channel);
-  }, []);
-
-  // ⭐ MERGED: Original (localStorage) + Admin (Supabase)
-  const products = [...originalCars, ...adminProducts];
-
-  // ── ADD: sirf Supabase mein jayega
+  // ── Add (sirf Supabase mein jayega)
   const addProduct = async (product) => {
-    const { error } = await supabase.from('products').insert([
-      {
-        name: product.name,
-        price: Number(product.price),
-        image: product.image,
-        image_dark: product.imageDark || product.image_dark || product.image,
-        mileage: product.mileage,
-        category: product.category,
-      },
-    ]);
-    if (error) console.error('Add product error:', error);
-  };
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert([{
+          name: product.name,
+          price: Number(product.price),
+          image: product.image,
+          image_dark: product.imageDark || product.image,
+          mileage: product.mileage,
+          category: product.category,
+        }])
+        .select()
+        .single();
 
-  // ── UPDATE: sirf admin wali update hogi
-  const updateProduct = async (id, data) => {
-    const isOriginal = originalCars.some((c) => c.id === id);
-    if (isOriginal) {
-      console.warn('⚠️ Original cars ko Supabase se update nahi kar sakte');
-      return;
-    }
+      if (error) throw error;
 
-    const { error } = await supabase
-      .from('products')
-      .update({
+      const newProduct = {
+        id: data.id,
         name: data.name,
         price: Number(data.price),
         image: data.image,
-        image_dark: data.imageDark || data.image_dark || data.image,
+        imageDark: data.image_dark || data.image,
         mileage: data.mileage,
         category: data.category,
-      })
-      .eq('id', id);
-    if (error) console.error('Update product error:', error);
-  };
+        isLocal: false,
+      };
 
-  // ── DELETE: sirf admin wali delete hogi
-  const deleteProduct = async (id) => {
-    const isOriginal = originalCars.some((c) => c.id === id);
-    if (isOriginal) {
-      console.warn('⚠️ Original cars delete nahi kar sakte');
-      return;
+      setRemoteProducts((prev) => [newProduct, ...prev]);
+      return newProduct;
+    } catch (err) {
+      console.error('Add product error:', err);
+      throw err;
     }
-
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) console.error('Delete product error:', error);
   };
 
-  // ── RESET: sirf admin wali reset hongi (originals safe rahenge)
+  // ── Update (sirf Supabase wale)
+  const updateProduct = async (id, updatedData) => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({
+          name: updatedData.name,
+          price: Number(updatedData.price),
+          image: updatedData.image,
+          image_dark: updatedData.imageDark || updatedData.image,
+          mileage: updatedData.mileage,
+          category: updatedData.category,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setRemoteProducts((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                id: data.id,
+                name: data.name,
+                price: Number(data.price),
+                image: data.image,
+                imageDark: data.image_dark || data.image,
+                mileage: data.mileage,
+                category: data.category,
+                isLocal: false,
+              }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error('Update product error:', err);
+      throw err;
+    }
+  };
+
+  // ── Delete (sirf Supabase wale)
+  const deleteProduct = async (id) => {
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) throw error;
+      setRemoteProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error('Delete product error:', err);
+      throw err;
+    }
+  };
+
+  // ── Reset (sirf Supabase wale delete honge, local safe hain)
   const resetProducts = async () => {
-    const { error } = await supabase.from('products').delete().neq('id', 0);
-    if (error) console.error('Reset products error:', error);
-  };
-
-  // ── Optional: Original cars ka metadata update karo (localStorage)
-  // Agar aap kabhi original cars ka price/name change karna chaho
-  const updateOriginalCar = (id, data) => {
-    setOriginalCars((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...data, isOriginal: true } : c))
-    );
-  };
-
-  const resetOriginalCars = () => {
-    localStorage.removeItem(ORIGINALS_KEY);
-    setOriginalCars(ORIGINAL_CARS);
+    try {
+      const ids = remoteProducts.map((p) => p.id);
+      if (ids.length > 0) {
+        const { error } = await supabase.from('products').delete().in('id', ids);
+        if (error) throw error;
+      }
+      setRemoteProducts([]);
+    } catch (err) {
+      console.error('Reset products error:', err);
+      throw err;
+    }
   };
 
   return (
     <ProductContext.Provider
-      value={{
-        products,          // ⭐ MERGED — jo CarList use karega
-        originalCars,      // ⭐ Sirf 3 originals
-        adminProducts,     // ⭐ Sirf admin wali
-        loading,
-        addProduct,
-        updateProduct,
-        deleteProduct,
-        resetProducts,
-        updateOriginalCar, // (optional)
-        resetOriginalCars, // (optional)
-      }}
+      value={{ products, loading, addProduct, updateProduct, deleteProduct, resetProducts, refetch: fetchProducts }}
     >
       {children}
     </ProductContext.Provider>

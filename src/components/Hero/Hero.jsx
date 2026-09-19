@@ -1,5 +1,3 @@
-
-
 import React from "react";
 import carPng from "../../assets/carPng.avif";
 import carYellow from "../../assets/carYellow.jpg";

@@ -1,4 +1,3 @@
-// src/components/Cart/CartDrawer.jsx
 import React from 'react';
 import { useCart } from '../../context/CartContext';
 import { useToast } from '../../context/ToastContext';
@@ -39,16 +38,7 @@ const CartDrawer = ({ isOpen, onClose, theme }) => {
             <>
               {cart.map((item) => (
                 <div key={item.id} className="flex items-center gap-4 py-4 border-b border-gray-200 dark:border-gray-700">
-                  {/* ⭐ FIX: Dono handle */}
-                  <img
-                    src={
-                      theme === 'dark'
-                        ? (item.imageDark || item.image_dark || item.image)
-                        : item.image
-                    }
-                    alt={item.name}
-                    className="w-20 h-20 object-contain rounded"
-                  />
+                  <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded" />
                   <div className="flex-1">
                     <h3 className="font-semibold">{item.name}</h3>
                     <p className="text-yellow-500">${item.price}/day</p>
