@@ -14,7 +14,16 @@ import ProductTable from './ProductTable';
 import ConfirmModal from './ConfirmModal';
 
 const AdminPanel = ({ theme }) => {
-  const { products, addProduct, updateProduct, deleteProduct, resetProducts } = useProducts();
+  // ⭐ originalCars bhi destructure kiya
+  const {
+    products,
+    originalCars,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    resetProducts,
+  } = useProducts();
+
   const { orders, updateOrderStatus, deleteOrder, stats } = useOrders();
   const { banners, addBanner, updateBanner, deleteBanner, toggleBanner } = useBanners();
   const { showToast } = useToast();
@@ -39,13 +48,30 @@ const AdminPanel = ({ theme }) => {
   const closeConfirm = () =>
     setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
 
+  // ── Check: kya ye original car hai?
+  const isOriginalCar = (product) => {
+    if (!product) return false;
+    return (
+      product.isOriginal === true ||
+      originalCars.some((c) => c.id === product.id)
+    );
+  };
+
   // ── Products
   const handleFormChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // ⭐ Safety: original car edit na ho
+    if (editingProduct && isOriginalCar(editingProduct)) {
+      showToast('Original cars edit nahi ho sakti', 'warning');
+      return;
+    }
+
     const productData = { ...formData, price: Number(formData.price) };
+
     if (editingProduct) {
       await updateProduct(editingProduct.id, productData);
       showToast('Product updated!', 'success');
@@ -54,16 +80,25 @@ const AdminPanel = ({ theme }) => {
       await addProduct(productData);
       showToast('Product added!', 'success');
     }
-    setFormData({ name: '', price: '', image: '', imageDark: '', mileage: '', category: '' });
+
+    setFormData({
+      name: '', price: '', image: '', imageDark: '', mileage: '', category: '',
+    });
   };
 
   const handleEdit = (product) => {
+    // ⭐ Original car pe edit block
+    if (isOriginalCar(product)) {
+      showToast('Original cars edit nahi ho sakti', 'warning');
+      return;
+    }
+
     setEditingProduct(product);
     setFormData({
       name: product.name,
       price: product.price,
       image: product.image,
-      imageDark: product.image_dark || '',
+      imageDark: product.image_dark || product.imageDark || '',
       mileage: product.mileage || '',
       category: product.category || '',
     });
@@ -71,6 +106,12 @@ const AdminPanel = ({ theme }) => {
   };
 
   const handleDelete = (product) => {
+    // ⭐ Original car pe delete block
+    if (isOriginalCar(product)) {
+      showToast('Original cars delete nahi ho sakti', 'warning');
+      return;
+    }
+
     openConfirm(
       'Delete Product?',
       `Are you sure you want to delete "${product.name}"?`,
@@ -84,16 +125,18 @@ const AdminPanel = ({ theme }) => {
 
   const handleCancelEdit = () => {
     setEditingProduct(null);
-    setFormData({ name: '', price: '', image: '', imageDark: '', mileage: '', category: '' });
+    setFormData({
+      name: '', price: '', image: '', imageDark: '', mileage: '', category: '',
+    });
   };
 
   const handleReset = () => {
     openConfirm(
-      'Reset Products?',
-      'All products will be restored to defaults.',
+      'Reset Admin Products?',
+      'Sirf admin se add ki gayi products delete hongi. Original 3 cars safe rahengi.',
       async () => {
         await resetProducts();
-        showToast('Products reset!', 'info');
+        showToast('Admin products reset!', 'info');
         closeConfirm();
       }
     );
@@ -197,7 +240,7 @@ const AdminPanel = ({ theme }) => {
                     : 'border-black/10 hover:border-yellow-500 hover:text-yellow-500'
                 }`}
               >
-                Reset Products
+                Reset Admin Products
               </button>
               <button
                 onClick={handleLogout}
@@ -243,6 +286,19 @@ const AdminPanel = ({ theme }) => {
           {/* ── Products */}
           {activeTab === 'products' && (
             <div className="space-y-8">
+              {/* Info banner */}
+              <div className={`p-4 rounded-2xl border flex items-center gap-3 text-xs ${
+                theme === 'dark'
+                  ? 'bg-blue-500/5 border-blue-500/20 text-blue-300'
+                  : 'bg-blue-50 border-blue-200 text-blue-700'
+              }`}>
+                <span className="text-lg">💡</span>
+                <p>
+                  <strong>Original 3 cars</strong> locked hain — inhe edit ya delete nahi kar sakte.
+                  Sirf admin se add ki gayi cars manage ho sakti hain.
+                </p>
+              </div>
+
               <ProductForm
                 theme={theme}
                 formData={formData}
@@ -251,8 +307,10 @@ const AdminPanel = ({ theme }) => {
                 editingProduct={editingProduct}
                 onCancel={handleCancelEdit}
               />
+
               <ProductTable
                 products={products}
+                originalCars={originalCars}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 theme={theme}

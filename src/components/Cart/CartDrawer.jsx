@@ -39,9 +39,13 @@ const CartDrawer = ({ isOpen, onClose, theme }) => {
             <>
               {cart.map((item) => (
                 <div key={item.id} className="flex items-center gap-4 py-4 border-b border-gray-200 dark:border-gray-700">
-                  {/* ⭐ FIX: image_dark (snake_case from Supabase) */}
+                  {/* ⭐ FIX: Dono handle */}
                   <img
-                    src={theme === 'dark' ? (item.image_dark || item.image) : item.image}
+                    src={
+                      theme === 'dark'
+                        ? (item.imageDark || item.image_dark || item.image)
+                        : item.image
+                    }
                     alt={item.name}
                     className="w-20 h-20 object-contain rounded"
                   />

@@ -1,8 +1,8 @@
 // src/components/Admin/ProductTable.jsx
 import React, { useState, useMemo } from 'react';
-import { FaEdit, FaTrash, FaSearch, FaFilter, FaTh, FaList } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaSearch, FaFilter, FaTh, FaList, FaLock } from 'react-icons/fa';
 
-const ProductTable = ({ products, onEdit, onDelete, theme }) => {
+const ProductTable = ({ products, originalCars = [], onEdit, onDelete, theme }) => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
@@ -22,6 +22,15 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
       ? 'bg-white/5 border-white/10 text-white placeholder-white/30'
       : 'bg-black/5 border-black/10 text-black placeholder-black/30'
   }`;
+
+  const getImage = (p) => {
+    if (theme === 'dark') {
+      return p.image_dark || p.imageDark || p.image;
+    }
+    return p.image;
+  };
+
+  const isOriginal = (p) => p.isOriginal === true || originalCars.some(c => c.id === p.id);
 
   return (
     <div className="space-y-6">
@@ -91,61 +100,84 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
 
       {viewMode === 'grid' && filtered.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map((product) => (
-            <div
-              key={product.id}
-              className={`group rounded-3xl border overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
-                theme === 'dark'
-                  ? 'border-white/10 bg-gray-900 hover:border-yellow-500/40'
-                  : 'border-black/10 bg-white hover:border-yellow-500/40 shadow-sm'
-              }`}
-            >
-              <div className={`h-40 flex items-center justify-center relative ${
-                theme === 'dark' ? 'bg-white/[0.02]' : 'bg-black/[0.02]'
-              }`}>
-                {/* ⭐ FIX: image_dark */}
-                <img
-                  src={theme === 'dark' ? (product.image_dark || product.image) : product.image}
-                  alt={product.name}
-                  className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-500 group-hover:scale-105"
-                />
-                {product.category && (
-                  <span className="absolute top-3 right-3 text-[10px] bg-yellow-500 text-black px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                    {product.category}
-                  </span>
-                )}
-              </div>
+          {filtered.map((product) => {
+            const locked = isOriginal(product);
+            return (
+              <div
+                key={`${locked ? 'orig' : 'admin'}-${product.id}`}
+                className={`group rounded-3xl border overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+                  theme === 'dark'
+                    ? 'border-white/10 bg-gray-900 hover:border-yellow-500/40'
+                    : 'border-black/10 bg-white hover:border-yellow-500/40 shadow-sm'
+                }`}
+              >
+                <div className={`h-40 flex items-center justify-center relative ${
+                  theme === 'dark' ? 'bg-white/[0.02]' : 'bg-black/[0.02]'
+                }`}>
+                  <img
+                    src={getImage(product)}
+                    alt={product.name}
+                    className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-500 group-hover:scale-105"
+                    onError={(e) => { e.target.src = product.image; }}
+                  />
 
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-serif font-bold text-base">{product.name}</h3>
-                    <p className="text-[10px] opacity-50 tracking-wide mt-0.5">
-                      {product.mileage || '—'}
+                  {/* Original badge */}
+                  {locked && (
+                    <span className="absolute top-3 left-3 flex items-center gap-1 text-[10px] bg-blue-500/90 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      <FaLock size={8} /> Original
+                    </span>
+                  )}
+
+                  {product.category && (
+                    <span className="absolute top-3 right-3 text-[10px] bg-yellow-500 text-black px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                      {product.category}
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-serif font-bold text-base">{product.name}</h3>
+                      <p className="text-[10px] opacity-50 tracking-wide mt-0.5">
+                        {product.mileage || '—'}
+                      </p>
+                    </div>
+                    <p className="font-serif font-bold text-yellow-500">
+                      ${product.price}
                     </p>
                   </div>
-                  <p className="font-serif font-bold text-yellow-500">
-                    ${product.price}
-                  </p>
-                </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => onEdit(product)}
-                    className="flex-1 bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <FaEdit size={10} /> Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(product)}
-                    className="flex-1 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <FaTrash size={10} /> Delete
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => !locked && onEdit(product)}
+                      disabled={locked}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                        locked
+                          ? 'bg-gray-500/10 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white'
+                      }`}
+                      title={locked ? 'Original cars edit nahi ho sakti' : 'Edit'}
+                    >
+                      <FaEdit size={10} /> Edit
+                    </button>
+                    <button
+                      onClick={() => !locked && onDelete(product)}
+                      disabled={locked}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                        locked
+                          ? 'bg-gray-500/10 text-gray-500 cursor-not-allowed'
+                          : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white'
+                      }`}
+                      title={locked ? 'Original cars delete nahi ho sakti' : 'Delete'}
+                    >
+                      <FaTrash size={10} /> Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -165,55 +197,75 @@ const ProductTable = ({ products, onEdit, onDelete, theme }) => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(p => (
-                  <tr
-                    key={p.id}
-                    className={`border-t transition-colors ${
-                      theme === 'dark'
-                        ? 'border-white/5 hover:bg-white/[0.03]'
-                        : 'border-black/5 hover:bg-black/[0.02]'
-                    }`}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
-                          theme === 'dark' ? 'bg-white/5' : 'bg-black/5'
-                        }`}>
-                          {/* ⭐ FIX: image_dark */}
-                          <img
-                            src={theme === 'dark' ? (p.image_dark || p.image) : p.image}
-                            alt={p.name}
-                            className="max-w-[80%] max-h-[80%] object-contain"
-                          />
+                {filtered.map(p => {
+                  const locked = isOriginal(p);
+                  return (
+                    <tr
+                      key={`${locked ? 'orig' : 'admin'}-${p.id}`}
+                      className={`border-t transition-colors ${
+                        theme === 'dark'
+                          ? 'border-white/5 hover:bg-white/[0.03]'
+                          : 'border-black/5 hover:bg-black/[0.02]'
+                      }`}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                            theme === 'dark' ? 'bg-white/5' : 'bg-black/5'
+                          }`}>
+                            <img
+                              src={getImage(p)}
+                              alt={p.name}
+                              className="max-w-[80%] max-h-[80%] object-contain"
+                              onError={(e) => { e.target.src = p.image; }}
+                            />
+                          </div>
+                          <div>
+                            <span className="font-semibold text-sm block">{p.name}</span>
+                            {locked && (
+                              <span className="text-[9px] text-blue-500 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                                <FaLock size={7} /> Original
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className="font-semibold text-sm">{p.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-[10px] bg-yellow-500/15 text-yellow-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
-                        {p.category || '—'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm opacity-70">{p.mileage || '—'}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-yellow-500">${p.price}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => onEdit(p)}
-                          className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white flex items-center justify-center transition-colors"
-                        >
-                          <FaEdit size={11} />
-                        </button>
-                        <button
-                          onClick={() => onDelete(p)}
-                          className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
-                        >
-                          <FaTrash size={11} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-[10px] bg-yellow-500/15 text-yellow-500 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                          {p.category || '—'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm opacity-70">{p.mileage || '—'}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-yellow-500">${p.price}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => !locked && onEdit(p)}
+                            disabled={locked}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                              locked
+                                ? 'bg-gray-500/10 text-gray-500 cursor-not-allowed'
+                                : 'bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white'
+                            }`}
+                          >
+                            <FaEdit size={11} />
+                          </button>
+                          <button
+                            onClick={() => !locked && onDelete(p)}
+                            disabled={locked}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                              locked
+                                ? 'bg-gray-500/10 text-gray-500 cursor-not-allowed'
+                                : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white'
+                            }`}
+                          >
+                            <FaTrash size={11} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
