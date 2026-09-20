@@ -7,8 +7,8 @@ const AdminLogin = ({ onLogin, theme }) => {
   const [loading, setLoading] = useState(false);
 
   // 🔐 YAHAN APNA USERNAME AUR PASSWORD SET KARO
-  const ADMIN_USERNAME = 'admin';
-  const ADMIN_PASSWORD = 'carrental@2025';
+  const ADMIN_USERNAME = 'ADMIN';
+  const ADMIN_PASSWORD = 'carrental2026';
 
   const handleSubmit = (e) => {
     e.preventDefault();
